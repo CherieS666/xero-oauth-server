@@ -6,22 +6,28 @@ import os
 
 app = Flask(__name__)
 
-CLIENT_ID = os.environ.get("XERO_CLIENT_ID")
-CLIENT_SECRET = os.environ.get("XERO_CLIENT_SECRET")
-REDIRECT_URI = os.environ.get("XERO_REDIRECT_URI")
 
-config = Configuration(
-    oauth2_token=OAuth2Token(
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET
+def get_xero_client():
+    client_id = os.environ.get("XERO_CLIENT_ID")
+    client_secret = os.environ.get("XERO_CLIENT_SECRET")
+
+    config = Configuration(
+        oauth2_token=OAuth2Token(
+            client_id=client_id,
+            client_secret=client_secret
+        )
     )
-)
 
-api_client = ApiClient(config)
+    return ApiClient(config)
 
 
 @app.route("/")
 def home():
+
+    redirect_uri = os.environ.get("XERO_REDIRECT_URI")
+
+    api_client = get_xero_client()
+
     auth_url = api_client.oauth2.get_authorization_url(
         scopes=[
             "offline_access",
@@ -29,7 +35,7 @@ def home():
             "payroll.timesheets",
             "payroll.payruns"
         ],
-        redirect_uri=os.environ.get("XERO_REDIRECT_URI")
+        redirect_uri=redirect_uri
     )
 
     return redirect(auth_url)
@@ -37,11 +43,16 @@ def home():
 
 @app.route("/callback")
 def callback():
+
+    redirect_uri = os.environ.get("XERO_REDIRECT_URI")
+
+    api_client = get_xero_client()
+
     code = request.args.get("code")
 
     token = api_client.oauth2.get_token(
         code=code,
-        redirect_uri=REDIRECT_URI
+        redirect_uri=redirect_uri
     )
 
     return "✅ Login successful. Token received!"
