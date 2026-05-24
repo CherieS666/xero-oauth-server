@@ -29,7 +29,7 @@ def home():
             "payroll.timesheets",
             "payroll.payruns"
         ],
-        redirect_uri=REDIRECT_URI
+        redirect_uri=os.environ.get("XERO_REDIRECT_URI")
     )
 
     return redirect(auth_url)
