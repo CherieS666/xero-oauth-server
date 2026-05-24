@@ -1,3 +1,4 @@
 flask
 gunicorn
 xero-python
+requests
