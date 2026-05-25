@@ -198,42 +198,64 @@ def callback():
     # FIRST ROW
     # =====================================
 
-    row = df.iloc[0]
+    for index, row in df.iterrows():
+        employee_id = row["employeeID"]
 
-    employee_id = row["employeeID"]
+        date = pd.to_datetime(row["date"]).strftime("%Y-%m-%d")
 
-    date = pd.to_datetime(row["date"]).strftime("%Y-%m-%d")
+        number_of_units = float(row["numberOfUnits"])
 
-    number_of_units = float(row["numberOfUnits"])
+        earnings_rate_id = row["EarningsRateID"]
 
-    earnings_rate_id = row["earningsRateID"]
+        # =====================================
+        # PAYROLL CALENDAR
+        # =====================================
+
+        payroll_calendar_id = "cb4913a8-82dc-4d48-ba55-b0d8567f29be"
+
+        # =====================================
+        # BUILD PAYLOAD
+        # =====================================
+
+        payload = {
+            "employeeID": employee_id,
+            "payrollCalendarID": payroll_calendar_id,
+            "startDate": "2026-05-18",
+            "endDate": "2026-05-24",
+            "timesheetLines": [
+                {
+                    "date": date,
+                    "earningsRateID": earnings_rate_id,
+                    "numberOfUnits": number_of_units,
+                }
+            ]
+        }
+
+        print("PAYLOAD:")
+        print(json.dumps(payload, indent=2))
+
+        # =====================================
+        # CREATE TIMESHEET
+        # =====================================
+
+        create_response = requests.post(
+            TIMESHEETS_URL,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Xero-tenant-id": tenant_id,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+
+        print("CREATE STATUS:")
+        print(create_response.status_code)
+
+        print("CREATE RESPONSE:")
+        print(create_response.text)
 
     # =====================================
-    # PAYROLL CALENDAR
-    # =====================================
-
-    payroll_calendar_id = "cb4913a8-82dc-4d48-ba55-b0d8567f29be"
-
-    # =====================================
-    # BUILD PAYLOAD
-    # =====================================
-
-    payload = {
-        "employeeID": employee_id,
-        "payrollCalendarID": payroll_calendar_id,
-        "startDate": "2026-05-18",
-        "endDate": "2026-05-24",
-        "timesheetLines": [
-            {
-                "date": date,
-                "earningsRateID": earnings_rate_id,
-                "numberOfUnits": number_of_units,
-            }
-        ]
-    }
-
-    print("PAYLOAD:")
-    print(json.dumps(payload, indent=2))
 
     # =====================================
     # CREATE TIMESHEET
