@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 import os
 import requests
 import secrets
+import json
 
 app = Flask(__name__)
 
@@ -42,7 +43,7 @@ EMPLOYEES_URL = "https://api.xero.com/payroll.xro/2.0/Employees"
 @app.route("/")
 def home():
 
-    # Check env vars
+    # Check environment variables
     if not CLIENT_ID:
         return "Missing XERO_CLIENT_ID", 500
 
@@ -52,7 +53,7 @@ def home():
     if not REDIRECT_URI:
         return "Missing XERO_REDIRECT_URI", 500
 
-    # Create OAuth state
+    # Generate OAuth state
     state = secrets.token_hex(16)
 
     session["oauth_state"] = state
@@ -80,7 +81,7 @@ def home():
     print("AUTH URL:")
     print(auth_url)
 
-    # Redirect to Xero login
+    # Redirect user to Xero
     return redirect(auth_url)
 
 # =========================================
@@ -90,13 +91,13 @@ def home():
 @app.route("/callback")
 def callback():
 
-    # Check state
+    # Validate state
     returned_state = request.args.get("state")
 
     if returned_state != session.get("oauth_state"):
         return "Invalid state parameter", 400
 
-    # Get auth code
+    # Get authorization code
     code = request.args.get("code")
 
     if not code:
@@ -119,7 +120,6 @@ def callback():
         },
     )
 
-    # Debugging
     print("TOKEN STATUS:")
     print(token_response.status_code)
 
@@ -128,19 +128,23 @@ def callback():
 
     # Check token response
     if token_response.status_code != 200:
+
         return f"""
-        <h2>Token Error</h2>
+        <h1>Token Error</h1>
         <pre>{token_response.text}</pre>
         """, 500
 
-    # Parse token JSON
+    # =====================================
+    # PARSE TOKENS
+    # =====================================
+
     token_data = token_response.json()
 
-    access_token = token_data["access_token"]
+    access_token = token_data.get("access_token")
 
-    refresh_token = token_data["refresh_token"]
+    refresh_token = token_data.get("refresh_token")
 
-    # Save tokens in session
+    # Save tokens
     session["access_token"] = access_token
     session["refresh_token"] = refresh_token
 
@@ -156,25 +160,38 @@ def callback():
         },
     )
 
+    print("CONNECTIONS STATUS:")
+    print(connections_response.status_code)
+
+    print("CONNECTIONS RESPONSE:")
+    print(connections_response.text)
+
+    # Check connections response
+    if connections_response.status_code != 200:
+
+        return f"""
+        <h1>Connections Error</h1>
+        <pre>{connections_response.text}</pre>
+        """, 500
+
     connections_data = connections_response.json()
 
-    print("CONNECTIONS:")
-    print(connections_data)
-
-    # Check if any tenants exist
     if not connections_data:
         return "No Xero tenants found", 400
 
-    # Get first tenant
+    # =====================================
+    # GET TENANT INFO
+    # =====================================
+
     tenant_id = connections_data[0]["tenantId"]
 
     tenant_name = connections_data[0]["tenantName"]
 
-    # Save tenant info
+    # Save tenant
     session["tenant_id"] = tenant_id
 
     # =====================================
-    # API HEADERS
+    # XERO API HEADERS
     # =====================================
 
     headers = {
@@ -184,7 +201,7 @@ def callback():
     }
 
     # =====================================
-    # GET PAYROLL EMPLOYEES
+    # GET EMPLOYEES
     # =====================================
 
     employees_response = requests.get(
@@ -199,6 +216,18 @@ def callback():
     print(employees_response.text)
 
     # =====================================
+    # FORMAT EMPLOYEE JSON
+    # =====================================
+
+    try:
+        employees_json = json.dumps(
+            employees_response.json(),
+            indent=2
+        )
+    except Exception:
+        employees_json = employees_response.text
+
+    # =====================================
     # SUCCESS PAGE
     # =====================================
 
@@ -211,8 +240,11 @@ def callback():
     <h2>Tenant ID</h2>
     <pre>{tenant_id}</pre>
 
+    <h2>Employees API Status</h2>
+    <pre>{employees_response.status_code}</pre>
+
     <h2>Employees API Response</h2>
-    <pre>{employees_response.text}</pre>
+    <pre>{employees_json}</pre>
     """
 
 # =========================================
