@@ -373,11 +373,17 @@ def callback():
     except Exception:
         employees_json = employees_response.text
 
+    create_json = create_response.text
+
+
     # =====================================
     # SUCCESS PAGE
     # =====================================
 
     return f"""
+    
+    
+    
     <h1>✅ Xero Connected Successfully</h1>
 
     <h2>Tenant Name</h2>
@@ -385,6 +391,12 @@ def callback():
 
     <h2>Tenant ID</h2>
     <pre>{tenant_id}</pre>
+    
+    <h2>Create Timesheet Status</h2>
+    <pre>{create_response.status_code}</pre>
+
+    <h2>Create Timesheet Response</h2>
+    <pre>{create_json}</pre>
 
     <h2>Employees API Status</h2>
     <pre>{employees_response.status_code}</pre>
