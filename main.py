@@ -217,11 +217,36 @@ def callback():
 
     print(timesheets_response.text)
 
-
-    timesheets_json = json.dumps(
+    try:
+        timesheets_json = json.dumps(
         timesheets_response.json(),
         indent=2
+        )
+    except Exception:
+        timesheets_json=timesheets_response.text
+
+    # =====================================
+    # GET DETAILED TIMESHEET
+    # =====================================
+
+    timesheet_id = "271a3456-0168-49ac-978a-a5eb1f314511"
+
+    details_response = requests.get(
+        f"https://api.xero.com/payroll.xro/2.0/Timesheets/{timesheet_id}",
+        headers=headers,
     )
+
+    print("DETAILS RESPONSE:")
+    print(details_response.text)
+
+    try:
+        details_json = json.dumps(
+            details_response.json(),
+            indent=2
+        )
+    except Exception:
+        details_json = details_response.text
+
     # =====================================
     # GET EARNINGS RATES
     # =====================================
@@ -301,6 +326,9 @@ def callback():
     
     <h2>Timesheets</h2>
     <pre>{timesheets_json}</pre>
+    
+    <h2>Detailed Timesheet</h2>
+    <pre>{details_json}</pre>
     
     <h2>Pay Runs</h2>
     <pre>{payruns_json}</pre>
