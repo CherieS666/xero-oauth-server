@@ -209,6 +209,20 @@ def callback():
         headers=headers,
     )
 
+    timesheets_response = requests.get(
+        "https://api.xero.com/payroll.xro/2.0/Timesheets",
+        headers=headers,
+    )
+
+    print(timesheets_response.text)
+
+
+    timesheets_json = json.dumps(
+        timesheets_response.json(),
+        indent=2
+    )
+
+
     print("EMPLOYEES STATUS:")
     print(employees_response.status_code)
 
@@ -245,6 +259,9 @@ def callback():
 
     <h2>Employees API Response</h2>
     <pre>{employees_json}</pre>
+    
+    <h2>Timesheets</h2>
+    <pre>{timesheets_json}</pre>
     """
 
 # =========================================
