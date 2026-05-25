@@ -238,7 +238,7 @@ def callback():
         "timesheetLines": [
             {
                 "date": str(date),
-                "EarningsRateID": earnings_rate_id,
+                "earningsRateID": earnings_rate_id,
                 "numberOfUnits": float(number_of_units),
             }
         ]
