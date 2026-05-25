@@ -61,7 +61,19 @@ def callback():
         },
     )
 
-    return response.text
+    token_data = response.json()
+
+    access_token = token_data["access_token"]
+
+    connections = requests.get(
+        "https://api.xero.com/connections",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+    )
+
+    return connections.text
 
 
 if __name__ == "__main__":
