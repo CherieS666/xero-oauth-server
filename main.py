@@ -221,6 +221,31 @@ def callback():
         timesheets_response.json(),
         indent=2
     )
+    # =====================================
+    # GET EARNINGS RATES
+    # =====================================
+
+    earnings_response = requests.get(
+        "https://api.xero.com/payroll.xro/2.0/EarningsRates",
+        headers=headers,
+    )
+
+    print("EARNINGS STATUS:")
+    print(earnings_response.status_code)
+
+    print("EARNINGS RESPONSE:")
+    print(earnings_response.text)
+
+    try:
+        earnings_json = json.dumps(
+            earnings_response.json(),
+            indent=2
+        )
+    except Exception:
+        earnings_json = earnings_response.text
+
+
+
 
     payruns_response = requests.get(
         "https://api.xero.com/payroll.xro/2.0/PayRuns",
@@ -278,6 +303,9 @@ def callback():
     
     <h2>Pay Runs</h2>
     <pre>{payruns_json}</pre>
+    
+    <h2>Earnings Rates</h2>
+    <pre>{earnings_json}</pre>
     """
 
 # =========================================
