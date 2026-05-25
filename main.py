@@ -213,6 +213,63 @@ def callback():
     print(df)
 
     # =====================================
+    # CREATE TIMESHEET FROM EXCEL
+    # =====================================
+
+    row = df.iloc[0]
+
+    employee_id = row["employeeID"]
+
+    date = row["date"]
+
+    number_of_units = row["numberOfUnits"]
+
+    earnings_rate_id = row["earningsRateID"]
+
+    # Your payroll calendar ID
+    payroll_calendar_id = "cb4913a8-82dc-4d48-ba55-b0d8567f29be"
+
+    # Build Xero payload
+    payload = {
+        "employeeID": employee_id,
+        "payrollCalendarID": payroll_calendar_id,
+        "startDate": "2026-05-25",
+        "endDate": "2026-05-31",
+        "timesheetLines": [
+            {
+                "date": str(date),
+                "earningsRateID": earnings_rate_id,
+                "numberOfUnits": float(number_of_units),
+            }
+        ]
+    }
+
+    print("PAYLOAD:")
+    print(json.dumps(payload, indent=2))
+
+    # =====================================
+    # POST TO XERO
+    # =====================================
+
+    create_response = requests.post(
+        "https://api.xero.com/payroll.xro/2.0/Timesheets",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Xero-tenant-id": tenant_id,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+    )
+
+    print("CREATE STATUS:")
+    print(create_response.status_code)
+
+    print("CREATE RESPONSE:")
+    print(create_response.text)
+
+
+    # =====================================
     # GET EMPLOYEES
     # =====================================
 
