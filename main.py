@@ -4,6 +4,7 @@ import os
 import requests
 import secrets
 import json
+import pandas as pd
 
 app = Flask(__name__)
 
@@ -200,6 +201,16 @@ def callback():
         "Xero-tenant-id": tenant_id,
         "Accept": "application/json",
     }
+
+    # =====================================
+    # READ EXCEL FILE
+    # =====================================
+
+    excel_path = "TestTS.xlsx"
+
+    df = pd.read_excel(excel_path)
+
+    print(df)
 
     # =====================================
     # GET EMPLOYEES
