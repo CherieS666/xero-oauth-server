@@ -206,7 +206,7 @@ def callback():
 
     number_of_units = float(row["numberOfUnits"])
 
-    earnings_rate_id = row["EarningsRateID"]
+    earnings_rate_id = row["earningsRateID"]
 
     # =====================================
     # PAYROLL CALENDAR
