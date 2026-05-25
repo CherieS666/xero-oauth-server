@@ -222,6 +222,19 @@ def callback():
         indent=2
     )
 
+    payruns_response = requests.get(
+        "https://api.xero.com/payroll.xro/2.0/PayRuns",
+        headers=headers,
+    )
+
+    try:
+        payruns_json = json.dumps(
+            payruns_response.json(),
+            indent=2
+        )
+    except Exception:
+        payruns_json = payruns_response.text
+
 
     print("EMPLOYEES STATUS:")
     print(employees_response.status_code)
@@ -262,6 +275,9 @@ def callback():
     
     <h2>Timesheets</h2>
     <pre>{timesheets_json}</pre>
+    
+    <h2>Pay Runs</h2>
+    <pre>{payruns_json}</pre>
     """
 
 # =========================================
