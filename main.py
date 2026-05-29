@@ -270,6 +270,12 @@ def callback():
             # BUILD PAYLOAD
             # =====================================
 
+            print("START DATE:", start_date)
+            print("END DATE:", end_date)
+            print("WORK DATE:", date)
+            print("PAYROLL TYPE:", payroll_type)
+
+
             payload = {
                 "employeeID": employee_id,
                 "payrollCalendarID": payroll_calendar_id,
