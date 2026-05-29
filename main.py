@@ -42,6 +42,8 @@ TIMESHEETS_URL = "https://api.xero.com/payroll.xro/2.0/Timesheets"
 
 PAYRUNS_URL = "https://api.xero.com/payroll.xro/2.0/PayRuns"
 
+EARNINGS_RATES_URL = "https://api.xero.com/payroll.xro/2.0/Settings"
+
 # =========================================
 # PAYROLL CALENDAR IDS
 # =========================================
@@ -195,6 +197,18 @@ def callback():
         "Xero-tenant-id": tenant_id,
         "Accept": "application/json",
     }
+
+    # =====================================
+    # GET EARNINGS RATES
+    # =====================================
+
+    earnings_response = requests.get(
+        EARNINGS_RATES_URL,
+        headers=headers,
+    )
+
+    print("EARNINGS RATES:")
+    print(json.dumps(earnings_response.json(), indent=2))
 
     # =====================================
     # READ EXCEL FILE
