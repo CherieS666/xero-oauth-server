@@ -1,4 +1,3 @@
-
 from flask import Flask, request, redirect, session
 from urllib.parse import urlencode
 import os
@@ -9,26 +8,26 @@ import pandas as pd
 
 app = Flask(__name__)
 
-# ======================================================
+# =========================================
 # FLASK SECRET
-# ======================================================
+# =========================================
 
 app.secret_key = os.environ.get(
     "FLASK_SECRET_KEY",
     "dev-secret"
 )
 
-# ======================================================
+# =========================================
 # ENV VARIABLES
-# ======================================================
+# =========================================
 
 CLIENT_ID = os.environ.get("XERO_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("XERO_CLIENT_SECRET")
 REDIRECT_URI = os.environ.get("XERO_REDIRECT_URI")
 
-# ======================================================
+# =========================================
 # XERO URLS
-# ======================================================
+# =========================================
 
 AUTH_URL = "https://login.xero.com/identity/connect/authorize"
 
@@ -40,27 +39,43 @@ EMPLOYEES_URL = "https://api.xero.com/payroll.xro/2.0/Employees"
 
 TIMESHEETS_URL = "https://api.xero.com/payroll.xro/2.0/Timesheets"
 
-SETTINGS_URL = "https://api.xero.com/payroll.xro/2.0/Settings"
+PAYRUNS_URL = "https://api.xero.com/payroll.xro/2.0/PayRuns"
 
-# ======================================================
-# PAYROLL CALENDARS
-# ======================================================
+# IMPORTANT
+EARNINGS_RATES_URL = (
+    "https://api.xero.com/payroll.xro/2.0/Settings/earningsrates"
+)
+
+# =========================================
+# PAYROLL CALENDAR IDS
+# =========================================
 
 WEEKLY_CALENDAR_ID = "cb4913a8-82dc-4d48-ba55-b0d8567f29be"
 
 FORTNIGHTLY_CALENDAR_ID = "590c0331-8b61-40ac-bbfa-33d7ed78e5d6"
 
-# ======================================================
+# =========================================
 # HOME
-# ======================================================
+# =========================================
 
 @app.route("/")
 def home():
 
+    if not CLIENT_ID:
+        return "Missing XERO_CLIENT_ID", 500
+
+    if not CLIENT_SECRET:
+        return "Missing XERO_CLIENT_SECRET", 500
+
+    if not REDIRECT_URI:
+        return "Missing XERO_REDIRECT_URI", 500
+
+    # Generate OAuth state
     state = secrets.token_hex(16)
 
     session["oauth_state"] = state
 
+    # OAuth params
     params = {
         "response_type": "code",
         "client_id": CLIENT_ID,
@@ -81,34 +96,34 @@ def home():
 
     return redirect(auth_url)
 
-# ======================================================
+# =========================================
 # CALLBACK
-# ======================================================
+# =========================================
 
 @app.route("/callback")
 def callback():
 
-    # ==================================================
+    # =====================================
     # VALIDATE STATE
-    # ==================================================
+    # =====================================
 
     returned_state = request.args.get("state")
 
     if returned_state != session.get("oauth_state"):
-        return "Invalid OAuth state", 400
+        return "Invalid state parameter", 400
 
-    # ==================================================
+    # =====================================
     # GET AUTH CODE
-    # ==================================================
+    # =====================================
 
     code = request.args.get("code")
 
     if not code:
-        return "No authorization code", 400
+        return "No authorization code received", 400
 
-    # ==================================================
+    # =====================================
     # EXCHANGE TOKEN
-    # ==================================================
+    # =====================================
 
     token_response = requests.post(
         TOKEN_URL,
@@ -119,8 +134,8 @@ def callback():
         },
         auth=(CLIENT_ID, CLIENT_SECRET),
         headers={
-            "Accept": "application/json"
-        }
+            "Accept": "application/json",
+        },
     )
 
     if token_response.status_code != 200:
@@ -128,150 +143,156 @@ def callback():
         return f"""
         <h1>Token Error</h1>
         <pre>{token_response.text}</pre>
-        """
+        """, 500
 
     token_data = token_response.json()
 
-    access_token = token_data["access_token"]
+    access_token = token_data.get("access_token")
 
-    # ==================================================
+    refresh_token = token_data.get("refresh_token")
+
+    session["access_token"] = access_token
+    session["refresh_token"] = refresh_token
+
+    # =====================================
     # GET CONNECTIONS
-    # ==================================================
+    # =====================================
 
     connections_response = requests.get(
         CONNECTIONS_URL,
         headers={
             "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json"
-        }
+            "Accept": "application/json",
+        },
     )
 
-    connections = connections_response.json()
+    if connections_response.status_code != 200:
 
-    tenant_id = connections[0]["tenantId"]
+        return f"""
+        <h1>Connections Error</h1>
+        <pre>{connections_response.text}</pre>
+        """, 500
 
-    tenant_name = connections[0]["tenantName"]
+    connections_data = connections_response.json()
 
-    # ==================================================
-    # HEADERS
-    # ==================================================
+    if not connections_data:
+        return "No Xero tenants found", 400
+
+    tenant_id = connections_data[0]["tenantId"]
+
+    tenant_name = connections_data[0]["tenantName"]
+
+    session["tenant_id"] = tenant_id
+
+    # =====================================
+    # API HEADERS
+    # =====================================
 
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Xero-tenant-id": tenant_id,
-        "Accept": "application/json"
+        "Accept": "application/json",
     }
 
-    # ==================================================
-    # GET SETTINGS
-    # ==================================================
+    # =====================================
+    # GET EARNINGS RATES
+    # =====================================
 
-    settings_response = requests.get(
-        SETTINGS_URL,
-        headers=headers
+    earnings_response = requests.get(
+        EARNINGS_RATES_URL,
+        headers=headers,
     )
 
-    settings_json = settings_response.json()
+    earnings_json = earnings_response.json()
 
-    earnings_rates = settings_json.get(
-        "earningsRates",
-        []
-    )
+    print("EARNINGS RESPONSE:")
+    print(json.dumps(earnings_json, indent=2))
 
-    # ==================================================
-    # BUILD EARNINGS TABLE HTML
-    # ==================================================
+    # =====================================
+    # BUILD EARNINGS TABLE
+    # =====================================
 
     earnings_html = """
-    <table border="1" cellpadding="6">
-        <tr>
-            <th>Name</th>
-            <th>Earnings Rate ID</th>
-            <th>Account Code</th>
-            <th>Type Of Units</th>
-        </tr>
+    <table border="1" cellpadding="5">
+    <tr>
+        <th>Name</th>
+        <th>Earnings Rate ID</th>
+        <th>Account Code</th>
+        <th>Type Of Units</th>
+    </tr>
     """
+
+    earnings_rates = earnings_json.get("earningsRates", [])
 
     for rate in earnings_rates:
 
+        name = rate.get("name", "")
+
+        earnings_rate_id = rate.get("earningsRateID", "")
+
+        account_code = rate.get("accountCode", "")
+
+        type_of_units = rate.get("typeOfUnits", "")
+
         earnings_html += f"""
         <tr>
-            <td>{rate.get("name")}</td>
-            <td>{rate.get("earningsRateID")}</td>
-            <td>{rate.get("accountCode")}</td>
-            <td>{rate.get("typeOfUnits")}</td>
+            <td>{name}</td>
+            <td>{earnings_rate_id}</td>
+            <td>{account_code}</td>
+            <td>{type_of_units}</td>
         </tr>
         """
 
     earnings_html += "</table>"
 
-    # ==================================================
-    # READ EXCEL
-    # ==================================================
+    # =====================================
+    # READ EXCEL FILE
+    # =====================================
 
     excel_path = "TestTS.xlsx"
 
     df = pd.read_excel(excel_path)
 
+    print("EXCEL DATA:")
     print(df)
 
-    # ==================================================
-    # RESULTS
-    # ==================================================
+    # =====================================
+    # LOOP THROUGH ALL ROWS
+    # =====================================
 
     all_results = []
-
-    # ==================================================
-    # LOOP ROWS
-    # ==================================================
 
     for index, row in df.iterrows():
 
         try:
 
-            # ==========================================
+            # =====================================
             # EXCEL VALUES
-            # ==========================================
+            # =====================================
 
-            employee_id = str(
-                row["employeeID"]
-            ).strip()
+            employee_id = str(row["employeeID"]).strip()
 
-            payroll_type = str(
-                row["payrollType"]
-            ).strip()
+            payroll_type = str(row["payrollType"]).strip()
 
-            work_date = pd.to_datetime(
-                row["date"]
-            )
+            work_date = pd.to_datetime(row["date"])
 
-            work_date_str = work_date.strftime(
-                "%Y-%m-%d"
-            )
-
-            number_of_units = float(
-                row["numberOfUnits"]
-            )
+            number_of_units = float(row["numberOfUnits"])
 
             earnings_rate_id = str(
                 row["earningsRateID"]
             ).strip()
 
-            # ==========================================
-            # VALIDATION
-            # ==========================================
+            # =====================================
+            # FORMAT DATE
+            # =====================================
 
-            if not earnings_rate_id:
+            work_date_str = work_date.strftime("%Y-%m-%d")
 
-                raise Exception(
-                    "Missing earningsRateID"
-                )
+            # =====================================
+            # WEEKLY
+            # =====================================
 
-            # ==========================================
-            # PAYROLL CALENDAR
-            # ==========================================
-
-            if payroll_type.lower() == "weekly":
+            if payroll_type == "Weekly":
 
                 payroll_calendar_id = WEEKLY_CALENDAR_ID
 
@@ -284,6 +305,10 @@ def callback():
                     start_date
                     + pd.Timedelta(days=6)
                 )
+
+            # =====================================
+            # FORTNIGHTLY
+            # =====================================
 
             else:
 
@@ -299,30 +324,24 @@ def callback():
                     + pd.Timedelta(days=13)
                 )
 
-            # ==========================================
-            # IMPORTANT
-            # XERO NEEDS PYTHON DATE OBJECTS
-            # ==========================================
+            # =====================================
+            # STRING DATES
+            # =====================================
 
-            start_date_str = start_date.date().isoformat()
+            start_date_str = start_date.strftime("%Y-%m-%d")
 
-            end_date_str = end_date.date().isoformat()
+            end_date_str = end_date.strftime("%Y-%m-%d")
 
-            # ==========================================
-            # DEBUGGING
-            # ==========================================
-
-            print("================================")
+            print("===================================")
             print("EMPLOYEE:", employee_id)
             print("WORK DATE:", work_date_str)
             print("START:", start_date_str)
             print("END:", end_date_str)
             print("EARNINGS RATE:", earnings_rate_id)
-            print("================================")
 
-            # ==========================================
+            # =====================================
             # PAYLOAD
-            # ==========================================
+            # =====================================
 
             payload = {
                 "employeeID": employee_id,
@@ -338,11 +357,12 @@ def callback():
                 ]
             }
 
+            print("PAYLOAD:")
             print(json.dumps(payload, indent=2))
 
-            # ==========================================
+            # =====================================
             # CREATE TIMESHEET
-            # ==========================================
+            # =====================================
 
             create_response = requests.post(
                 TIMESHEETS_URL,
@@ -350,18 +370,21 @@ def callback():
                     "Authorization": f"Bearer {access_token}",
                     "Xero-tenant-id": tenant_id,
                     "Accept": "application/json",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 },
-                json=payload
+                json=payload,
             )
 
+            print("STATUS:")
             print(create_response.status_code)
+
+            print("RESPONSE:")
             print(create_response.text)
 
             all_results.append({
                 "employeeID": employee_id,
                 "status": create_response.status_code,
-                "response": create_response.text
+                "response": create_response.text,
             })
 
         except Exception as e:
@@ -372,16 +395,16 @@ def callback():
                     "UNKNOWN"
                 ),
                 "status": "ERROR",
-                "response": str(e)
+                "response": str(e),
             })
 
-    # ==================================================
+    # =====================================
     # GET ALL TIMESHEETS
-    # ==================================================
+    # =====================================
 
     timesheets_response = requests.get(
         TIMESHEETS_URL,
-        headers=headers
+        headers=headers,
     )
 
     try:
@@ -395,9 +418,49 @@ def callback():
 
         timesheets_json = timesheets_response.text
 
-    # ==================================================
-    # BUILD RESULTS HTML
-    # ==================================================
+    # =====================================
+    # GET EMPLOYEES
+    # =====================================
+
+    employees_response = requests.get(
+        EMPLOYEES_URL,
+        headers=headers,
+    )
+
+    try:
+
+        employees_json = json.dumps(
+            employees_response.json(),
+            indent=2
+        )
+
+    except Exception:
+
+        employees_json = employees_response.text
+
+    # =====================================
+    # GET PAYRUNS
+    # =====================================
+
+    payruns_response = requests.get(
+        PAYRUNS_URL,
+        headers=headers,
+    )
+
+    try:
+
+        payruns_json = json.dumps(
+            payruns_response.json(),
+            indent=2
+        )
+
+    except Exception:
+
+        payruns_json = payruns_response.text
+
+    # =====================================
+    # FORMAT RESULTS
+    # =====================================
 
     results_html = ""
 
@@ -416,9 +479,9 @@ def callback():
         <hr>
         """
 
-    # ==================================================
-    # FINAL PAGE
-    # ==================================================
+    # =====================================
+    # SUCCESS PAGE
+    # =====================================
 
     return f"""
 
@@ -438,15 +501,23 @@ def callback():
 
     {results_html}
 
+    <h2>All Employees</h2>
+
+    <pre>{employees_json}</pre>
+
     <h2>All Timesheets</h2>
 
     <pre>{timesheets_json}</pre>
 
+    <h2>All Pay Runs</h2>
+
+    <pre>{payruns_json}</pre>
+
     """
 
-# ======================================================
+# =========================================
 # ERROR HANDLER
-# ======================================================
+# =========================================
 
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -456,19 +527,16 @@ def handle_exception(e):
     <pre>{str(e)}</pre>
     """, 500
 
-# ======================================================
+# =========================================
 # START SERVER
-# ======================================================
+# =========================================
 
 if __name__ == "__main__":
 
-    port = int(
-        os.environ.get("PORT", 5000)
-    )
+    port = int(os.environ.get("PORT", 5000))
 
     app.run(
         host="0.0.0.0",
         port=port,
-        debug=True
+        debug=True,
     )
-
