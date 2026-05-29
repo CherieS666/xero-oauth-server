@@ -41,7 +41,19 @@ TIMESHEETS_URL = "https://api.xero.com/payroll.xro/2.0/Timesheets"
 
 PAYRUNS_URL = "https://api.xero.com/payroll.xro/2.0/PayRuns"
 
-EARNINGS_URL = "https://api.xero.com/payroll.xro/2.0/EarningsRates"
+# =========================================
+# PAYROLL CALENDAR IDS
+# =========================================
+
+WEEKLY_CALENDAR_ID = "cb4913a8-82dc-4d48-ba55-b0d8567f29be"
+
+FORTNIGHTLY_CALENDAR_ID = "590c0331-8b61-40ac-bbfa-33d7ed78e5d6"
+
+# =========================================
+# EARNINGS RATE ID
+# =========================================
+
+EARNINGS_RATE_ID = "3747f42a-4cda-40c6-8e8f-896cd931f557"
 
 # =========================================
 # HOME
@@ -59,7 +71,7 @@ def home():
     if not REDIRECT_URI:
         return "Missing XERO_REDIRECT_URI", 500
 
-    # OAuth state
+    # Generate OAuth state
     state = secrets.token_hex(16)
 
     session["oauth_state"] = state
@@ -195,68 +207,138 @@ def callback():
     print(df)
 
     # =====================================
-    # FIRST ROW
+    # LOOP THROUGH ALL ROWS
     # =====================================
 
-    row = df.iloc[0]
+    all_results = []
 
-    employee_id = row["employeeID"]
+    for index, row in df.iterrows():
 
-    date = pd.to_datetime(row["date"]).strftime("%Y-%m-%d")
+        try:
 
-    number_of_units = float(row["numberOfUnits"])
+            # =====================================
+            # EXCEL VALUES
+            # =====================================
 
-    earnings_rate_id = "3747f42a-4cda-40c6-8e8f-896cd931f557"
+            employee_id = row["employeeID"]
 
-    # =====================================
-    # PAYROLL CALENDAR
-    # =====================================
+            payroll_type = row["payrollType"]
 
-    payroll_calendar_id = "cb4913a8-82dc-4d48-ba55-b0d8567f29be"
+            work_date = pd.to_datetime(row["date"])
 
-    # =====================================
-    # BUILD PAYLOAD
-    # =====================================
+            date = work_date.strftime("%Y-%m-%d")
 
-    payload = {
-        "employeeID": employee_id,
-        "payrollCalendarID": payroll_calendar_id,
-        "startDate": "2026-05-18",
-        "endDate": "2026-05-24",
-        "timesheetLines": [
-            {
-                "date": date,
-                "earningsRateID": earnings_rate_id,
-                "numberOfUnits": number_of_units,
+            number_of_units = float(row["numberOfUnits"])
+
+            # =====================================
+            # WEEKLY / FORTNIGHTLY
+            # =====================================
+
+            if payroll_type == "Weekly":
+
+                payroll_calendar_id = WEEKLY_CALENDAR_ID
+
+                start_date = (
+                    work_date
+                    - pd.Timedelta(days=work_date.weekday())
+                )
+
+                end_date = (
+                    start_date
+                    + pd.Timedelta(days=6)
+                )
+
+            else:
+
+                payroll_calendar_id = FORTNIGHTLY_CALENDAR_ID
+
+                start_date = (
+                    work_date
+                    - pd.Timedelta(days=work_date.weekday())
+                )
+
+                end_date = (
+                    start_date
+                    + pd.Timedelta(days=13)
+                )
+
+            start_date_str = start_date.strftime("%Y-%m-%d")
+
+            end_date_str = end_date.strftime("%Y-%m-%d")
+
+            # =====================================
+            # BUILD PAYLOAD
+            # =====================================
+
+            payload = {
+                "employeeID": employee_id,
+                "payrollCalendarID": payroll_calendar_id,
+                "startDate": start_date_str,
+                "endDate": end_date_str,
+                "timesheetLines": [
+                    {
+                        "date": date,
+                        "earningsRateID": EARNINGS_RATE_ID,
+                        "numberOfUnits": number_of_units,
+                    }
+                ]
             }
-        ]
-    }
 
-    print("PAYLOAD:")
-    print(json.dumps(payload, indent=2))
+            print("PAYLOAD:")
+            print(json.dumps(payload, indent=2))
+
+            # =====================================
+            # CREATE TIMESHEET
+            # =====================================
+
+            create_response = requests.post(
+                TIMESHEETS_URL,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Xero-tenant-id": tenant_id,
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+
+            print("CREATE STATUS:")
+            print(create_response.status_code)
+
+            print("CREATE RESPONSE:")
+            print(create_response.text)
+
+            # Save result
+            all_results.append({
+                "employeeID": employee_id,
+                "status": create_response.status_code,
+                "response": create_response.text,
+            })
+
+        except Exception as e:
+
+            all_results.append({
+                "employeeID": row.get("employeeID", "UNKNOWN"),
+                "status": "ERROR",
+                "response": str(e),
+            })
 
     # =====================================
-    # CREATE TIMESHEET
+    # GET ALL TIMESHEETS
     # =====================================
 
-    create_response = requests.post(
+    timesheets_response = requests.get(
         TIMESHEETS_URL,
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Xero-tenant-id": tenant_id,
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
-        json=payload,
+        headers=headers,
     )
 
-    print("CREATE STATUS:")
-    print(create_response.status_code)
-
-    print("CREATE RESPONSE:")
-    print(create_response.text)
-
-    create_json = create_response.text
+    try:
+        timesheets_json = json.dumps(
+            timesheets_response.json(),
+            indent=2
+        )
+    except Exception:
+        timesheets_json = timesheets_response.text
 
     # =====================================
     # GET EMPLOYEES
@@ -276,23 +358,6 @@ def callback():
         employees_json = employees_response.text
 
     # =====================================
-    # GET TIMESHEETS
-    # =====================================
-
-    timesheets_response = requests.get(
-        TIMESHEETS_URL,
-        headers=headers,
-    )
-
-    try:
-        timesheets_json = json.dumps(
-            timesheets_response.json(),
-            indent=2
-        )
-    except Exception:
-        timesheets_json = timesheets_response.text
-
-    # =====================================
     # GET PAYRUNS
     # =====================================
 
@@ -310,10 +375,25 @@ def callback():
         payruns_json = payruns_response.text
 
     # =====================================
-    # GET EARNINGS RATES
+    # FORMAT RESULTS
     # =====================================
 
+    results_html = ""
 
+    for result in all_results:
+
+        results_html += f"""
+        <h3>Employee ID</h3>
+        <pre>{result["employeeID"]}</pre>
+
+        <h3>Status</h3>
+        <pre>{result["status"]}</pre>
+
+        <h3>Response</h3>
+        <pre>{result["response"]}</pre>
+
+        <hr>
+        """
 
     # =====================================
     # SUCCESS PAGE
@@ -329,22 +409,18 @@ def callback():
     <h2>Tenant ID</h2>
     <pre>{tenant_id}</pre>
 
-    <h2>Create Timesheet Status</h2>
-    <pre>{create_response.status_code}</pre>
+    <h2>Upload Results</h2>
 
-    <h2>Create Timesheet Response</h2>
-    <pre>{create_json}</pre>
+    {results_html}
 
-    <h2>Employees</h2>
+    <h2>All Employees</h2>
     <pre>{employees_json}</pre>
 
-    <h2>Timesheets</h2>
+    <h2>All Timesheets</h2>
     <pre>{timesheets_json}</pre>
 
-    <h2>Pay Runs</h2>
+    <h2>All Pay Runs</h2>
     <pre>{payruns_json}</pre>
-
-    
 
     """
 
