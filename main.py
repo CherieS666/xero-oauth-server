@@ -1,4 +1,4 @@
-```python
+
 from flask import Flask, request, redirect, session
 from urllib.parse import urlencode
 import os
