@@ -44,6 +44,8 @@ PAYRUNS_URL = "https://api.xero.com/payroll.xro/2.0/PayRuns"
 
 EARNINGS_RATES_URL = "https://api.xero.com/payroll.xro/2.0/Settings"
 
+SETTINGS_URL = "https://api.xero.com/payroll.xro/2.0/Settings"
+
 # =========================================
 # PAYROLL CALENDAR IDS
 # =========================================
@@ -197,6 +199,21 @@ def callback():
         "Xero-tenant-id": tenant_id,
         "Accept": "application/json",
     }
+
+    # =====================================
+    # EarningID
+    # =====================================
+
+    settings_response = requests.get(
+        SETTINGS_URL,
+        headers=headers,
+    )
+
+    settings_json = settings_response.json()
+
+    print(json.dumps(settings_json, indent=2))
+
+
 
     # =====================================
     # GET EARNINGS RATES
