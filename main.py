@@ -91,7 +91,7 @@ def home():
             "payroll.employees "
             "payroll.timesheets "
             "payroll.payruns"
-            "payroll.settings"
+
 
         ),
         "state": state,
@@ -203,6 +203,10 @@ def callback():
     # GET EARNINGS RATES
     # =====================================
 
+    # =====================================
+    # GET EARNINGS RATES
+    # =====================================
+
     settings_response = requests.get(
         "https://api.xero.com/payroll.xro/2.0/Settings",
         headers=headers,
@@ -252,8 +256,6 @@ def callback():
         earnings_rates_html = f"""
         <pre>{json.dumps(settings_json, indent=2)}</pre>
         """
-
-
 
     # =====================================
     # READ EXCEL FILE
