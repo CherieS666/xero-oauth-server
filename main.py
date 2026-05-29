@@ -313,17 +313,39 @@ def callback():
     # GET EARNINGS RATES
     # =====================================
 
+
     earnings_response = requests.get(
         EARNINGS_URL,
         headers=headers,
     )
 
+    print("EARNINGS STATUS:")
+    print(earnings_response.status_code)
+
+    print("EARNINGS RESPONSE:")
+    print(earnings_response.text)
+
+    # Convert JSON
+    earnings_data = earnings_response.json()
+
+    # Create lookup dictionary
+    earnings_lookup = {}
+
+    for rate in earnings_data["earningsRates"]:
+        earnings_lookup[rate["name"]] = rate["earningsRateID"]
+
+    print("EARNINGS LOOKUP:")
+    print(earnings_lookup)
+
     try:
+
         earnings_json = json.dumps(
             earnings_response.json(),
             indent=2
         )
+
     except Exception:
+
         earnings_json = earnings_response.text
 
     # =====================================
