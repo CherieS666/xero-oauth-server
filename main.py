@@ -4,29 +4,30 @@ import os
 import requests
 import secrets
 import json
+import pandas as pd
 
 app = Flask(__name__)
 
-# ======================================================
-# FLASK SECRET
-# ======================================================
+# =========================================
+# SECRET KEY
+# =========================================
 
 app.secret_key = os.environ.get(
     "FLASK_SECRET_KEY",
-    "dev-secret"
+    "super-secret-key"
 )
 
-# ======================================================
+# =========================================
 # ENV VARIABLES
-# ======================================================
+# =========================================
 
 CLIENT_ID = os.environ.get("XERO_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("XERO_CLIENT_SECRET")
 REDIRECT_URI = os.environ.get("XERO_REDIRECT_URI")
 
-# ======================================================
+# =========================================
 # XERO URLS
-# ======================================================
+# =========================================
 
 AUTH_URL = "https://login.xero.com/identity/connect/authorize"
 
@@ -36,27 +37,16 @@ CONNECTIONS_URL = "https://api.xero.com/connections"
 
 SETTINGS_URL = "https://api.xero.com/payroll.xro/2.0/Settings"
 
-# ======================================================
-# APP
-# ======================================================
+TIMESHEETS_URL = "https://api.xero.com/payroll.xro/2.0/Timesheets"
 
-app = Flask(__name__)
+EMPLOYEES_URL = "https://api.xero.com/payroll.xro/2.0/Employees"
 
-# ======================================================
+# =========================================
 # HOME
-# ======================================================
+# =========================================
 
 @app.route("/")
 def home():
-
-    if not CLIENT_ID:
-        return "Missing XERO_CLIENT_ID"
-
-    if not CLIENT_SECRET:
-        return "Missing XERO_CLIENT_SECRET"
-
-    if not REDIRECT_URI:
-        return "Missing XERO_REDIRECT_URI"
 
     state = secrets.token_hex(16)
 
@@ -66,17 +56,15 @@ def home():
         "response_type": "code",
         "client_id": CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
-
-        # IMPORTANT:
-        # payroll.settings is REQUIRED
         "scope": (
             "openid "
             "profile "
             "email "
             "offline_access "
+            "payroll.employees "
+            "payroll.timesheets "
             "payroll.settings"
         ),
-
         "state": state,
     }
 
@@ -84,34 +72,34 @@ def home():
 
     return redirect(auth_url)
 
-# ======================================================
+# =========================================
 # CALLBACK
-# ======================================================
+# =========================================
 
 @app.route("/callback")
 def callback():
 
-    # ==================================================
+    # =====================================
     # VALIDATE STATE
-    # ==================================================
+    # =====================================
 
     returned_state = request.args.get("state")
 
     if returned_state != session.get("oauth_state"):
-        return "Invalid state"
+        return "Invalid OAuth state"
 
-    # ==================================================
-    # GET CODE
-    # ==================================================
+    # =====================================
+    # GET AUTH CODE
+    # =====================================
 
     code = request.args.get("code")
 
     if not code:
-        return "No code returned"
+        return "No code received"
 
-    # ==================================================
+    # =====================================
     # TOKEN REQUEST
-    # ==================================================
+    # =====================================
 
     token_response = requests.post(
         TOKEN_URL,
@@ -122,55 +110,31 @@ def callback():
         },
         auth=(CLIENT_ID, CLIENT_SECRET),
         headers={
-            "Accept": "application/json",
-        },
+            "Accept": "application/json"
+        }
     )
-
-    # ==================================================
-    # TOKEN ERROR
-    # ==================================================
-
-    if token_response.status_code != 200:
-
-        return f"""
-        <h1>TOKEN ERROR</h1>
-        <pre>{token_response.text}</pre>
-        """
-
-    # ==================================================
-    # TOKEN JSON
-    # ==================================================
 
     token_json = token_response.json()
 
     access_token = token_json.get("access_token")
 
-    # ==================================================
-    # CONNECTIONS
-    # ==================================================
+    if not access_token:
+        return f"""
+        <h1>Token Error</h1>
+        <pre>{json.dumps(token_json, indent=2)}</pre>
+        """
+
+    # =====================================
+    # GET TENANT
+    # =====================================
 
     connections_response = requests.get(
         CONNECTIONS_URL,
         headers={
             "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-        },
+            "Accept": "application/json"
+        }
     )
-
-    # ==================================================
-    # CONNECTION ERROR
-    # ==================================================
-
-    if connections_response.status_code != 200:
-
-        return f"""
-        <h1>CONNECTION ERROR</h1>
-        <pre>{connections_response.text}</pre>
-        """
-
-    # ==================================================
-    # CONNECTION JSON
-    # ==================================================
 
     connections_json = connections_response.json()
 
@@ -181,34 +145,28 @@ def callback():
 
     tenant_name = connections_json[0]["tenantName"]
 
-    # ==================================================
+    # =====================================
     # HEADERS
-    # ==================================================
+    # =====================================
 
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Xero-tenant-id": tenant_id,
-        "Accept": "application/json",
+        "Accept": "application/json"
     }
 
-    # ==================================================
-    # SETTINGS REQUEST
-    # ==================================================
+    # =====================================
+    # GET SETTINGS
+    # =====================================
 
     settings_response = requests.get(
         SETTINGS_URL,
-        headers=headers,
+        headers=headers
     )
 
-    # ==================================================
-    # RAW RESPONSE
-    # ==================================================
-
-    raw_text = settings_response.text
-
-    # ==================================================
-    # API ERROR
-    # ==================================================
+    # =====================================
+    # HANDLE SETTINGS ERROR
+    # =====================================
 
     if settings_response.status_code != 200:
 
@@ -219,101 +177,81 @@ def callback():
         <pre>{settings_response.status_code}</pre>
 
         <h2>Response</h2>
-        <pre>{raw_text}</pre>
+        <pre>{settings_response.text}</pre>
         """
 
-    # ==================================================
-    # JSON PARSE
-    # ==================================================
+    # =====================================
+    # PARSE JSON
+    # =====================================
 
-    try:
-        settings_json = settings_response.json()
+    settings_json = settings_response.json()
 
-    except Exception as e:
+    earnings_rates = settings_json.get("earningsRates", [])
 
-        return f"""
-        <h1>JSON ERROR</h1>
+    # =====================================
+    # BUILD HTML TABLE
+    # =====================================
 
-        <h2>Exception</h2>
-        <pre>{str(e)}</pre>
-
-        <h2>Raw Response</h2>
-        <pre>{raw_text}</pre>
-        """
-
-    # ==================================================
-    # DEBUG FULL JSON
-    # ==================================================
-
-    pretty_json = json.dumps(
-        settings_json,
-        indent=2
-    )
-
-    # ==================================================
-    # EARNINGS RATES
-    # ==================================================
-
-    earnings_rates = settings_json.get(
-        "earningsRates",
-        []
-    )
-
-    # ==================================================
-    # HTML TABLE
-    # ==================================================
-
-    table_rows = ""
+    earnings_html = """
+    <table border="1" cellpadding="5">
+        <tr>
+            <th>Name</th>
+            <th>Earnings Rate ID</th>
+            <th>Account Code</th>
+            <th>Type Of Units</th>
+        </tr>
+    """
 
     for rate in earnings_rates:
 
-        name = rate.get("name", "")
-
-        earnings_rate_id = rate.get(
-            "earningsRateID",
-            ""
-        )
-
-        account_code = rate.get(
-            "accountCode",
-            ""
-        )
-
-        type_of_units = rate.get(
-            "typeOfUnits",
-            ""
-        )
-
-        table_rows += f"""
+        earnings_html += f"""
         <tr>
-            <td>{name}</td>
-            <td>{earnings_rate_id}</td>
-            <td>{account_code}</td>
-            <td>{type_of_units}</td>
+            <td>{rate.get('name')}</td>
+            <td>{rate.get('earningsRateID')}</td>
+            <td>{rate.get('accountCode')}</td>
+            <td>{rate.get('typeOfUnits')}</td>
         </tr>
         """
 
-    # ==================================================
-    # NO DATA
-    # ==================================================
+    earnings_html += "</table>"
 
-    if not earnings_rates:
+    # =====================================
+    # OPTIONAL EXCEL LOAD
+    # =====================================
 
-        table_rows = """
-        <tr>
-            <td colspan='4'>
-                No earnings rates found
-            </td>
-        </tr>
+    excel_output = ""
+
+    try:
+
+        df = pd.read_excel("TestTS.xlsx")
+
+        excel_output = df.to_html(index=False)
+
+    except Exception as e:
+
+        excel_output = f"""
+        <h3>Excel Error</h3>
+        <pre>{str(e)}</pre>
         """
 
-    # ==================================================
-    # SUCCESS PAGE
-    # ==================================================
+    # =====================================
+    # GET EMPLOYEES
+    # =====================================
+
+    employees_response = requests.get(
+        EMPLOYEES_URL,
+        headers=headers
+    )
+
+    employees_text = employees_response.text
+
+    # =====================================
+    # RETURN PAGE
+    # =====================================
 
     return f"""
 
-    <h1>✅ Xero Connected</h1>
+    <h1>✅ Xero Connected Successfully</h1>
 
     <h2>Tenant Name</h2>
     <pre>{tenant_name}</pre>
@@ -323,28 +261,21 @@ def callback():
 
     <h2>Earnings Rates</h2>
 
-    <table border="1" cellpadding="8">
+    {earnings_html}
 
-        <tr>
-            <th>Name</th>
-            <th>Earnings Rate ID</th>
-            <th>Account Code</th>
-            <th>Type Of Units</th>
-        </tr>
+    <h2>Excel File</h2>
 
-        {table_rows}
+    {excel_output}
 
-    </table>
+    <h2>Employees</h2>
 
-    <h2>Raw Settings JSON</h2>
-
-    <pre>{pretty_json}</pre>
+    <pre>{employees_text}</pre>
 
     """
 
-# ======================================================
+# =========================================
 # ERROR HANDLER
-# ======================================================
+# =========================================
 
 @app.errorhandler(Exception)
 def handle_error(e):
@@ -352,11 +283,11 @@ def handle_error(e):
     return f"""
     <h1>Application Error</h1>
     <pre>{str(e)}</pre>
-    """
+    """, 500
 
-# ======================================================
-# START
-# ======================================================
+# =========================================
+# START APP
+# =========================================
 
 if __name__ == "__main__":
 
@@ -365,5 +296,5 @@ if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=port,
-        debug=True,
+        debug=True
     )
