@@ -53,7 +53,7 @@ FORTNIGHTLY_CALENDAR_ID = "590c0331-8b61-40ac-bbfa-33d7ed78e5d6"
 # EARNINGS RATE ID
 # =========================================
 
-EARNINGS_RATE_ID = "3747f42a-4cda-40c6-8e8f-896cd931f557"
+EARNINGS_RATE_ID = row["earningsRateID"]
 
 # =========================================
 # HOME
