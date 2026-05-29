@@ -238,60 +238,38 @@ def callback():
             # =====================================
             # WEEKLY / FORTNIGHTLY
             # =====================================
-            # =====================================
-            # GET EXISTING TIMESHEETS
-            # =====================================
 
-            existing_timesheets_response = requests.get(
-                TIMESHEETS_URL,
-                headers=headers,
-            )
+            if payroll_type == "Weekly":
 
-            existing_timesheets = existing_timesheets_response.json().get(
-                "timesheets",
-                []
-            )
+                payroll_calendar_id = WEEKLY_CALENDAR_ID
 
-            # =====================================
-            # FIND MATCHING PAY PERIOD
-            # =====================================
+                start_date = (
+                    work_date
+                    - pd.Timedelta(days=work_date.weekday())
+                )
 
-            matched_timesheet = None
-
-            for ts in existing_timesheets:
-
-                if ts["employeeID"] != employee_id:
-                    continue
-
-                ts_start = pd.to_datetime(ts["startDate"])
-                ts_end = pd.to_datetime(ts["endDate"])
-
-                if ts_start <= work_date <= ts_end:
-                    matched_timesheet = ts
-                    break
-
-            # =====================================
-            # USE MATCHED PERIOD
-            # =====================================
-
-            if matched_timesheet:
-
-                payroll_calendar_id = matched_timesheet["payrollCalendarID"]
-
-                start_date_str = pd.to_datetime(
-                    matched_timesheet["startDate"]
-                ).strftime("%Y-%m-%d")
-
-                end_date_str = pd.to_datetime(
-                    matched_timesheet["endDate"]
-                ).strftime("%Y-%m-%d")
+                end_date = (
+                    start_date
+                    + pd.Timedelta(days=6)
+                )
 
             else:
 
-                raise Exception(
-                    f"No matching payroll period found for {employee_id}"
+                payroll_calendar_id = FORTNIGHTLY_CALENDAR_ID
+
+                start_date = (
+                    work_date
+                    - pd.Timedelta(days=work_date.weekday())
                 )
 
+                end_date = (
+                    start_date
+                    + pd.Timedelta(days=13)
+                )
+
+            start_date_str = start_date.strftime("%Y-%m-%d")
+
+            end_date_str = end_date.strftime("%Y-%m-%d")
 
             # =====================================
             # BUILD PAYLOAD
