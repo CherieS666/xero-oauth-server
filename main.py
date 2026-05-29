@@ -228,7 +228,7 @@ def callback():
     }
 
     # =====================================
-    # GET SETTINGS
+    # GET SETTINGS / EARNINGS RATES
     # =====================================
 
     settings_response = requests.get(
@@ -238,51 +238,37 @@ def callback():
 
     settings_json = settings_response.json()
 
-    print("\n===== SETTINGS =====")
-
-    print(
-        json.dumps(
-            settings_json,
-            indent=2
-        )
-    )
-
-    # =====================================
-    # GET EARNINGS RATES
-    # =====================================
-
     earnings_rates = (
         settings_json
         .get("payItems", {})
         .get("earningsRates", [])
     )
 
+    earnings_html = ""
+
     print("\n===== EARNINGS RATES =====")
 
-    if not earnings_rates:
+    for rate in earnings_rates:
 
-        print("NO EARNINGS RATES FOUND")
+        earnings_html += f"""
+        <tr>
+            <td>{rate.get("name")}</td>
+            <td>{rate.get("earningsRateID")}</td>
+            <td>{rate.get("accountCode")}</td>
+            <td>{rate.get("typeOfUnits")}</td>
+        </tr>
+        """
 
-    else:
+        print(
+            f'NAME: {rate.get("name")}'
+        )
 
-        for rate in earnings_rates:
-
-            print(
-                f'NAME: {rate.get("name")}'
-            )
-
-            print(
-                f'ID: {rate.get("earningsRateID")}'
-            )
-
-            print(
-                f'TYPE: {rate.get("typeOfUnits")}'
-            )
-
-            print("-" * 50)
+        print(
+            f'ID: {rate.get("earningsRateID")}'
+        )
 
     # =====================================
-    # READ EXCEL FILE
+    # READ EXCEL
     # =====================================
 
     excel_path = "TestTS.xlsx"
@@ -302,10 +288,6 @@ def callback():
     for index, row in df.iterrows():
 
         try:
-
-            # =================================
-            # EXCEL VALUES
-            # =================================
 
             employee_id = (
                 str(row["employeeID"]).strip()
@@ -334,50 +316,35 @@ def callback():
                 .strip()
             )
 
-            print("\n====================")
-            print("PROCESSING ROW")
-            print("====================")
+            # =================================
+            # CALCULATE START DATE
+            # SUNDAY -> SATURDAY
+            # =================================
 
-            print(
-                "EMPLOYEE ID:",
-                employee_id
+            weekday = work_date.weekday()
+
+            # Monday=0 -> Sunday=6
+            # Convert to Sunday start
+
+            days_since_sunday = (
+                (weekday + 1) % 7
             )
 
-            print(
-                "PAYROLL TYPE:",
-                payroll_type
-            )
-
-            print(
-                "WORK DATE:",
-                date
-            )
-
-            print(
-                "UNITS:",
-                number_of_units
-            )
-
-            print(
-                "EARNINGS RATE ID:",
-                earnings_rate_id
+            start_date = (
+                work_date
+                - pd.Timedelta(
+                    days=days_since_sunday
+                )
             )
 
             # =================================
-            # PAYROLL CALENDAR
+            # WEEKLY / FORTNIGHTLY
             # =================================
 
             if payroll_type == "weekly":
 
                 payroll_calendar_id = (
                     WEEKLY_CALENDAR_ID
-                )
-
-                start_date = (
-                    work_date
-                    - pd.Timedelta(
-                        days=work_date.weekday()
-                    )
                 )
 
                 end_date = (
@@ -389,13 +356,6 @@ def callback():
 
                 payroll_calendar_id = (
                     FORTNIGHTLY_CALENDAR_ID
-                )
-
-                start_date = (
-                    work_date
-                    - pd.Timedelta(
-                        days=work_date.weekday()
-                    )
                 )
 
                 end_date = (
@@ -418,6 +378,25 @@ def callback():
                 end_date.strftime("%Y-%m-%d")
             )
 
+            print("\n====================")
+            print("PROCESSING ROW")
+            print("====================")
+
+            print(
+                "EMPLOYEE ID:",
+                employee_id
+            )
+
+            print(
+                "PAYROLL TYPE:",
+                payroll_type
+            )
+
+            print(
+                "WORK DATE:",
+                date
+            )
+
             print(
                 "START DATE:",
                 start_date_str
@@ -426,6 +405,11 @@ def callback():
             print(
                 "END DATE:",
                 end_date_str
+            )
+
+            print(
+                "EARNINGS RATE ID:",
+                earnings_rate_id
             )
 
             # =================================
@@ -483,7 +467,6 @@ def callback():
             print("\n===== RESPONSE =====")
 
             print(
-                "STATUS:",
                 create_response.status_code
             )
 
@@ -504,10 +487,6 @@ def callback():
             })
 
         except Exception as e:
-
-            print("\n===== ERROR =====")
-
-            print(str(e))
 
             all_results.append({
                 "employeeID": (
@@ -579,11 +558,28 @@ def callback():
     <h2>Tenant ID</h2>
     <pre>{tenant_id}</pre>
 
+    <h2>Earnings Rates</h2>
+
+    <table border="1" cellpadding="8">
+        <tr>
+            <th>Name</th>
+            <th>Earnings Rate ID</th>
+            <th>Account Code</th>
+            <th>Type Of Units</th>
+        </tr>
+
+        {earnings_html}
+
+    </table>
+
+    <br>
+
     <h2>Upload Results</h2>
 
     {results_html}
 
     <h2>All Timesheets</h2>
+
     <pre>{timesheets_json}</pre>
 
     """
