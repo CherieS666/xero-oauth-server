@@ -222,13 +222,15 @@ def callback():
     # GET EARNINGS RATES
     # =================================================
 
+    # =================================================
+    # GET EARNINGS RATES
+    # =================================================
+
     earnings_html = """
     <table border='1' cellpadding='5'>
     <tr>
-        <th>Name</th>
-        <th>Earnings Rate ID</th>
-        <th>Account Code</th>
-        <th>Type Of Units</th>
+        <th>Status</th>
+        <th>Response</th>
     </tr>
     """
 
@@ -239,80 +241,31 @@ def callback():
             headers=headers,
         )
 
+        earnings_html += f"""
+        <tr>
+            <td>{earnings_response.status_code}</td>
+            <td>
+            <pre>{earnings_response.text}</pre>
+            </td>
+        </tr>
+        """
+
         print("EARNINGS STATUS:")
         print(earnings_response.status_code)
 
         print("EARNINGS TEXT:")
         print(earnings_response.text)
 
-        if earnings_response.status_code == 200:
-
-            earnings_json = (
-                earnings_response.json()
-            )
-
-            earnings_rates = (
-                earnings_json.get(
-                    "earningsRates",
-                    []
-                )
-            )
-
-            for rate in earnings_rates:
-
-                name = rate.get(
-                    "name",
-                    ""
-                )
-
-                earnings_rate_id = rate.get(
-                    "earningsRateID",
-                    ""
-                )
-
-                account_code = rate.get(
-                    "accountCode",
-                    ""
-                )
-
-                type_of_units = rate.get(
-                    "typeOfUnits",
-                    ""
-                )
-
-                earnings_html += f"""
-                <tr>
-                    <td>{name}</td>
-                    <td>{earnings_rate_id}</td>
-                    <td>{account_code}</td>
-                    <td>{type_of_units}</td>
-                </tr>
-                """
-
-        else:
-
-            earnings_html += f"""
-            <tr>
-                <td colspan='4'>
-                    API ERROR:
-                    {earnings_response.text}
-                </td>
-            </tr>
-            """
-
     except Exception as e:
 
         earnings_html += f"""
         <tr>
-            <td colspan='4'>
-                ERROR:
-                {str(e)}
-            </td>
+            <td>ERROR</td>
+            <td>{str(e)}</td>
         </tr>
         """
 
     earnings_html += "</table>"
-
     # =================================================
     # READ EXCEL
     # =================================================
