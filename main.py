@@ -199,6 +199,62 @@ def callback():
     }
 
     # =====================================
+    # GET EARNINGS RATES
+    # =====================================
+
+    settings_response = requests.get(
+        "https://api.xero.com/payroll.xro/2.0/Settings",
+        headers=headers,
+    )
+
+    settings_json = settings_response.json()
+
+    print("SETTINGS RESPONSE:")
+    print(json.dumps(settings_json, indent=2))
+
+    earnings_rates_html = ""
+
+    if "earningsRates" in settings_json:
+
+        earnings_rates_html += """
+        <table border="1" cellpadding="5">
+            <tr>
+                <th>Name</th>
+                <th>Earnings Rate ID</th>
+                <th>Account Code</th>
+                <th>Type Of Units</th>
+            </tr>
+        """
+
+        for rate in settings_json["earningsRates"]:
+            rate_name = rate.get("name", "")
+
+            rate_id = rate.get("earningsRateID", "")
+
+            account_code = rate.get("accountCode", "")
+
+            type_of_units = rate.get("typeOfUnits", "")
+
+            earnings_rates_html += f"""
+            <tr>
+                <td>{rate_name}</td>
+                <td>{rate_id}</td>
+                <td>{account_code}</td>
+                <td>{type_of_units}</td>
+            </tr>
+            """
+
+        earnings_rates_html += "</table>"
+
+    else:
+
+        earnings_rates_html = f"""
+        <pre>{json.dumps(settings_json, indent=2)}</pre>
+        """
+
+
+
+    # =====================================
     # READ EXCEL FILE
     # =====================================
 
@@ -426,6 +482,9 @@ def callback():
 
     <h2>All Pay Runs</h2>
     <pre>{payruns_json}</pre>
+    
+    <h2>Earnings Rates</h2>
+    <pre>{earnings_rates_html}</pre>
 
     """
 
