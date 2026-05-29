@@ -5,11 +5,11 @@ from urllib.parse import urlencode
 import os
 import secrets
 import requests
-import json
 import pandas as pd
+import json
 
 # =====================================================
-# FLASK APP
+# FLASK
 # =====================================================
 
 app = Flask(__name__)
@@ -24,32 +24,47 @@ app.secret_key = os.environ.get(
 # =====================================================
 
 CLIENT_ID = os.environ.get("XERO_CLIENT_ID")
-CLIENT_SECRET = os.environ.get("XERO_CLIENT_SECRET")
-REDIRECT_URI = os.environ.get("XERO_REDIRECT_URI")
+
+CLIENT_SECRET = os.environ.get(
+    "XERO_CLIENT_SECRET"
+)
+
+REDIRECT_URI = os.environ.get(
+    "XERO_REDIRECT_URI"
+)
 
 # =====================================================
 # XERO URLS
 # =====================================================
 
-AUTH_URL = "https://login.xero.com/identity/connect/authorize"
+AUTH_URL = (
+    "https://login.xero.com/"
+    "identity/connect/authorize"
+)
 
-TOKEN_URL = "https://identity.xero.com/connect/token"
+TOKEN_URL = (
+    "https://identity.xero.com/"
+    "connect/token"
+)
 
-CONNECTIONS_URL = "https://api.xero.com/connections"
+CONNECTIONS_URL = (
+    "https://api.xero.com/connections"
+)
 
-TIMESHEETS_URL = "https://api.xero.com/payroll.xro/2.0/Timesheets"
+EMPLOYEES_URL = (
+    "https://api.xero.com/"
+    "payroll.xro/2.0/Employees"
+)
 
-EMPLOYEES_URL = "https://api.xero.com/payroll.xro/2.0/Employees"
+TIMESHEETS_URL = (
+    "https://api.xero.com/"
+    "payroll.xro/2.0/Timesheets"
+)
 
-PAYRUNS_URL = "https://api.xero.com/payroll.xro/2.0/PayRuns"
-
-# =====================================================
-# PAYROLL CALENDAR IDS
-# =====================================================
-
-WEEKLY_CALENDAR_ID = "cb4913a8-82dc-4d48-ba55-b0d8567f29be"
-
-FORTNIGHTLY_CALENDAR_ID = "590c0331-8b61-40ac-bbfa-33d7ed78e5d6"
+PAYRUNS_URL = (
+    "https://api.xero.com/"
+    "payroll.xro/2.0/PayRuns"
+)
 
 # =====================================================
 # HOME
@@ -59,13 +74,13 @@ FORTNIGHTLY_CALENDAR_ID = "590c0331-8b61-40ac-bbfa-33d7ed78e5d6"
 def home():
 
     if not CLIENT_ID:
-        return "Missing XERO_CLIENT_ID", 500
+        return "Missing CLIENT_ID", 500
 
     if not CLIENT_SECRET:
-        return "Missing XERO_CLIENT_SECRET", 500
+        return "Missing CLIENT_SECRET", 500
 
     if not REDIRECT_URI:
-        return "Missing XERO_REDIRECT_URI", 500
+        return "Missing REDIRECT_URI", 500
 
     state = secrets.token_hex(16)
 
@@ -87,63 +102,76 @@ def home():
         "state": state,
     }
 
-    auth_url = f"{AUTH_URL}?{urlencode(params)}"
+    auth_url = (
+        f"{AUTH_URL}?"
+        f"{urlencode(params)}"
+    )
 
     return redirect(auth_url)
 
 # =====================================================
-# HELPER FUNCTIONS
+# HEADERS
 # =====================================================
 
 def build_headers(access_token, tenant_id):
 
     return {
-        "Authorization": f"Bearer {access_token}",
-        "Xero-tenant-id": tenant_id,
-        "Accept": "application/json",
-        "Content-Type": "application/json",
+        "Authorization":
+            f"Bearer {access_token}",
+
+        "Xero-tenant-id":
+            tenant_id,
+
+        "Accept":
+            "application/json",
+
+        "Content-Type":
+            "application/json",
     }
 
-def get_calendar_and_dates(work_date, payroll_type):
+# =====================================================
+# MATCH PAYRUN
+# =====================================================
 
-    if payroll_type == "Weekly":
+def get_matching_payrun(
+    work_date,
+    payroll_type,
+    payruns_data
+):
 
-        payroll_calendar_id = WEEKLY_CALENDAR_ID
+    for payrun in payruns_data["payRuns"]:
 
-        start_date = (
-            work_date
-            - pd.Timedelta(days=work_date.weekday())
+        if (
+            payrun["calendarType"].lower()
+            != payroll_type.lower()
+        ):
+            continue
+
+        start_date = pd.to_datetime(
+            payrun["periodStartDate"]
         )
 
-        end_date = (
-            start_date
-            + pd.Timedelta(days=6)
+        end_date = pd.to_datetime(
+            payrun["periodEndDate"]
         )
 
-        total_days = 7
+        if start_date <= work_date <= end_date:
 
-    else:
+            return {
+                "payrollCalendarID":
+                    payrun["payrollCalendarID"],
 
-        payroll_calendar_id = FORTNIGHTLY_CALENDAR_ID
+                "startDate":
+                    start_date,
 
-        start_date = (
-            work_date
-            - pd.Timedelta(days=work_date.weekday())
-        )
+                "endDate":
+                    end_date,
 
-        end_date = (
-            start_date
-            + pd.Timedelta(days=13)
-        )
+                "calendarType":
+                    payrun["calendarType"]
+            }
 
-        total_days = 14
-
-    return (
-        payroll_calendar_id,
-        start_date,
-        end_date,
-        total_days
-    )
+    return None
 
 # =====================================================
 # CALLBACK
@@ -158,7 +186,9 @@ def callback():
 
     returned_state = request.args.get("state")
 
-    if returned_state != session.get("oauth_state"):
+    if returned_state != session.get(
+        "oauth_state"
+    ):
         return "Invalid OAuth state", 400
 
     # =================================================
@@ -177,13 +207,19 @@ def callback():
     token_response = requests.post(
         TOKEN_URL,
         data={
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": REDIRECT_URI,
+            "grant_type":
+                "authorization_code",
+
+            "code":
+                code,
+
+            "redirect_uri":
+                REDIRECT_URI,
         },
         auth=(CLIENT_ID, CLIENT_SECRET),
         headers={
-            "Accept": "application/json",
+            "Accept":
+                "application/json",
         },
     )
 
@@ -192,15 +228,20 @@ def callback():
         return f"""
         <h1>Token Error</h1>
         <pre>{token_response.text}</pre>
-        """, 500
+        """
 
     token_data = token_response.json()
 
-    access_token = token_data.get("access_token")
+    access_token = token_data.get(
+        "access_token"
+    )
 
-    refresh_token = token_data.get("refresh_token")
+    refresh_token = token_data.get(
+        "refresh_token"
+    )
 
     session["access_token"] = access_token
+
     session["refresh_token"] = refresh_token
 
     # =================================================
@@ -210,8 +251,11 @@ def callback():
     connections_response = requests.get(
         CONNECTIONS_URL,
         headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
+            "Authorization":
+                f"Bearer {access_token}",
+
+            "Accept":
+                "application/json",
         },
     )
 
@@ -220,12 +264,12 @@ def callback():
         return f"""
         <h1>Connections Error</h1>
         <pre>{connections_response.text}</pre>
-        """, 500
+        """
 
     connections = connections_response.json()
 
     if not connections:
-        return "No tenants found", 400
+        return "No tenants found"
 
     tenant = connections[0]
 
@@ -233,9 +277,40 @@ def callback():
 
     tenant_name = tenant["tenantName"]
 
-    session["tenant_id"] = tenant_id
+    headers = build_headers(
+        access_token,
+        tenant_id
+    )
 
-    headers = build_headers(access_token, tenant_id)
+    # =================================================
+    # GET EMPLOYEES
+    # =================================================
+
+    employees_response = requests.get(
+        EMPLOYEES_URL,
+        headers=headers,
+    )
+
+    employees_data = employees_response.json()
+
+    employee_map = {}
+
+    for emp in employees_data["employees"]:
+
+        employee_map[
+            emp["employeeID"]
+        ] = emp
+
+    # =================================================
+    # GET PAYRUNS
+    # =================================================
+
+    payruns_response = requests.get(
+        PAYRUNS_URL,
+        headers=headers,
+    )
+
+    payruns_data = payruns_response.json()
 
     # =================================================
     # READ EXCEL
@@ -244,12 +319,6 @@ def callback():
     excel_path = "TestTS.xlsx"
 
     df = pd.read_excel(excel_path)
-
-    print("======================================")
-    print("EXCEL DATA")
-    print("======================================")
-
-    print(df)
 
     # =================================================
     # CLEAN DATA
@@ -273,7 +342,9 @@ def callback():
         .str.strip()
     )
 
-    df["date"] = pd.to_datetime(df["date"])
+    df["date"] = pd.to_datetime(
+        df["date"]
+    )
 
     df["numberOfUnits"] = (
         df["numberOfUnits"]
@@ -281,112 +352,317 @@ def callback():
     )
 
     # =================================================
-    # BUILD GROUPED TIMESHEETS
+    # GROUP TIMESHEETS
     # =================================================
 
     grouped_timesheets = {}
 
+    all_results = []
+
     for _, row in df.iterrows():
 
-        employee_id = row["employeeID"]
+        try:
 
-        payroll_type = row["payrollType"]
+            employee_id = row["employeeID"]
 
-        work_date = row["date"]
+            payroll_type = row["payrollType"]
 
-        earnings_rate_id = row["earningsRateID"]
+            work_date = row["date"]
 
-        number_of_units = float(row["numberOfUnits"])
+            earnings_rate_id = (
+                row["earningsRateID"]
+            )
 
-        (
-            payroll_calendar_id,
-            start_date,
-            end_date,
-            total_days
-        ) = get_calendar_and_dates(
-            work_date,
-            payroll_type
-        )
+            number_of_units = float(
+                row["numberOfUnits"]
+            )
 
-        start_date_str = start_date.strftime("%Y-%m-%d")
+            # =========================================
+            # EMPLOYEE EXISTS
+            # =========================================
 
-        end_date_str = end_date.strftime("%Y-%m-%d")
+            if employee_id not in employee_map:
 
-        key = (
-            employee_id,
-            payroll_calendar_id,
-            start_date_str,
-            end_date_str
-        )
+                all_results.append({
+                    "employeeID":
+                        employee_id,
 
-        # =============================================
-        # CREATE BASE TIMESHEET
-        # =============================================
+                    "status":
+                        "ERROR",
 
-        if key not in grouped_timesheets:
+                    "response":
+                        "Employee not found"
+                })
 
-            grouped_timesheets[key] = {
-                "employeeID": employee_id,
-                "payrollCalendarID": payroll_calendar_id,
-                "startDate": start_date_str,
-                "endDate": end_date_str,
-                "lines": {}
-            }
+                continue
 
-        # =============================================
-        # CREATE EARNINGS LINE
-        # =============================================
+            employee = employee_map[
+                employee_id
+            ]
 
-        if earnings_rate_id not in grouped_timesheets[key]["lines"]:
+            # =========================================
+            # EMPLOYEE TERMINATED
+            # =========================================
 
-            grouped_timesheets[key]["lines"][
+            end_date = employee.get("endDate")
+
+            if end_date:
+
+                end_date = pd.to_datetime(
+                    end_date
+                )
+
+                if work_date > end_date:
+
+                    all_results.append({
+                        "employeeID":
+                            employee_id,
+
+                        "status":
+                            "SKIPPED",
+
+                        "response":
+                            (
+                                "Work date after "
+                                "employee end date"
+                            )
+                    })
+
+                    continue
+
+            # =========================================
+            # MATCH PAYRUN
+            # =========================================
+
+            matching_payrun = (
+                get_matching_payrun(
+                    work_date,
+                    payroll_type,
+                    payruns_data
+                )
+            )
+
+            if not matching_payrun:
+
+                all_results.append({
+                    "employeeID":
+                        employee_id,
+
+                    "status":
+                        "ERROR",
+
+                    "response":
+                        (
+                            "No matching payrun "
+                            "found"
+                        )
+                })
+
+                continue
+
+            payroll_calendar_id = (
+                matching_payrun[
+                    "payrollCalendarID"
+                ]
+            )
+
+            start_date = (
+                matching_payrun[
+                    "startDate"
+                ]
+            )
+
+            end_date = (
+                matching_payrun[
+                    "endDate"
+                ]
+            )
+
+            start_date_str = (
+                start_date.strftime(
+                    "%Y-%m-%d"
+                )
+            )
+
+            end_date_str = (
+                end_date.strftime(
+                    "%Y-%m-%d"
+                )
+            )
+
+            # =========================================
+            # CALENDAR VALIDATION
+            # =========================================
+
+            employee_calendar = (
+                employee[
+                    "payrollCalendarID"
+                ]
+            )
+
+            if (
+                employee_calendar
+                != payroll_calendar_id
+            ):
+
+                all_results.append({
+                    "employeeID":
+                        employee_id,
+
+                    "status":
+                        "ERROR",
+
+                    "response":
+                        (
+                            "Employee payroll "
+                            "calendar mismatch"
+                        )
+                })
+
+                continue
+
+            # =========================================
+            # TOTAL DAYS
+            # =========================================
+
+            if payroll_type.lower() == "weekly":
+                total_days = 7
+            else:
+                total_days = 14
+
+            # =========================================
+            # GROUP KEY
+            # =========================================
+
+            key = (
+                employee_id,
+                payroll_calendar_id,
+                start_date_str,
+                end_date_str
+            )
+
+            # =========================================
+            # CREATE GROUP
+            # =========================================
+
+            if key not in grouped_timesheets:
+
+                grouped_timesheets[key] = {
+                    "employeeID":
+                        employee_id,
+
+                    "payrollCalendarID":
+                        payroll_calendar_id,
+
+                    "startDate":
+                        start_date_str,
+
+                    "endDate":
+                        end_date_str,
+
+                    "lines":
+                        {}
+                }
+
+            # =========================================
+            # CREATE EARNINGS LINE
+            # =========================================
+
+            if (
                 earnings_rate_id
-            ] = [0] * total_days
+                not in grouped_timesheets[
+                    key
+                ]["lines"]
+            ):
 
-        # =============================================
-        # DAY INDEX
-        # =============================================
+                grouped_timesheets[
+                    key
+                ]["lines"][
+                    earnings_rate_id
+                ] = [0] * total_days
 
-        day_index = (
-            work_date - start_date
-        ).days
+            # =========================================
+            # DAY INDEX
+            # =========================================
 
-        grouped_timesheets[key]["lines"][
-            earnings_rate_id
-        ][day_index] += number_of_units
+            day_index = (
+                work_date - start_date
+            ).days
+
+            grouped_timesheets[
+                key
+            ]["lines"][
+                earnings_rate_id
+            ][day_index] += (
+                number_of_units
+            )
+
+        except Exception as e:
+
+            all_results.append({
+                "employeeID":
+                    row.get(
+                        "employeeID",
+                        "UNKNOWN"
+                    ),
+
+                "status":
+                    "ERROR",
+
+                "response":
+                    str(e)
+            })
 
     # =================================================
     # CREATE TIMESHEETS
     # =================================================
 
-    all_results = []
-
     for key, ts in grouped_timesheets.items():
 
-        timesheet_lines = []
-
-        for earnings_rate_id, units_array in ts["lines"].items():
-
-            timesheet_lines.append({
-                "earningsRateID": earnings_rate_id,
-                "numberOfUnits": units_array
-            })
-
-        payload = {
-            "employeeID": ts["employeeID"],
-            "payrollCalendarID": ts["payrollCalendarID"],
-            "startDate": ts["startDate"],
-            "endDate": ts["endDate"],
-            "timesheetLines": timesheet_lines
-        }
-
-        print("======================================")
-        print("TIMESHEET PAYLOAD")
-        print("======================================")
-
-        print(json.dumps(payload, indent=2))
-
         try:
+
+            timesheet_lines = []
+
+            for (
+                earnings_rate_id,
+                units_array
+            ) in ts["lines"].items():
+
+                timesheet_lines.append({
+                    "earningsRateID":
+                        earnings_rate_id,
+
+                    "numberOfUnits":
+                        units_array
+                })
+
+            payload = {
+                "employeeID":
+                    ts["employeeID"],
+
+                "payrollCalendarID":
+                    ts["payrollCalendarID"],
+
+                "startDate":
+                    ts["startDate"],
+
+                "endDate":
+                    ts["endDate"],
+
+                "timesheetLines":
+                    timesheet_lines
+            }
+
+            print("================================")
+            print("TIMESHEET PAYLOAD")
+            print("================================")
+
+            print(
+                json.dumps(
+                    payload,
+                    indent=2
+                )
+            )
 
             create_response = requests.post(
                 TIMESHEETS_URL,
@@ -395,87 +671,39 @@ def callback():
             )
 
             print("STATUS:")
-            print(create_response.status_code)
+            print(
+                create_response.status_code
+            )
 
             print("RESPONSE:")
             print(create_response.text)
 
             all_results.append({
-                "employeeID": ts["employeeID"],
-                "status": create_response.status_code,
-                "response": create_response.text,
+                "employeeID":
+                    ts["employeeID"],
+
+                "status":
+                    create_response.status_code,
+
+                "response":
+                    create_response.text
             })
 
         except Exception as e:
 
             all_results.append({
-                "employeeID": ts["employeeID"],
-                "status": "ERROR",
-                "response": str(e),
+                "employeeID":
+                    ts["employeeID"],
+
+                "status":
+                    "ERROR",
+
+                "response":
+                    str(e)
             })
 
     # =================================================
-    # GET EMPLOYEES
-    # =================================================
-
-    employees_response = requests.get(
-        EMPLOYEES_URL,
-        headers=headers,
-    )
-
-    try:
-
-        employees_json = json.dumps(
-            employees_response.json(),
-            indent=2
-        )
-
-    except Exception:
-
-        employees_json = employees_response.text
-
-    # =================================================
-    # GET TIMESHEETS
-    # =================================================
-
-    timesheets_response = requests.get(
-        TIMESHEETS_URL,
-        headers=headers,
-    )
-
-    try:
-
-        timesheets_json = json.dumps(
-            timesheets_response.json(),
-            indent=2
-        )
-
-    except Exception:
-
-        timesheets_json = timesheets_response.text
-
-    # =================================================
-    # GET PAYRUNS
-    # =================================================
-
-    payruns_response = requests.get(
-        PAYRUNS_URL,
-        headers=headers,
-    )
-
-    try:
-
-        payruns_json = json.dumps(
-            payruns_response.json(),
-            indent=2
-        )
-
-    except Exception:
-
-        payruns_json = payruns_response.text
-
-    # =================================================
-    # BUILD RESULTS HTML
+    # FORMAT RESULTS
     # =================================================
 
     results_html = ""
@@ -483,6 +711,7 @@ def callback():
     for result in all_results:
 
         results_html += f"""
+
         <h3>Employee ID</h3>
         <pre>{result["employeeID"]}</pre>
 
@@ -493,6 +722,7 @@ def callback():
         <pre>{result["response"]}</pre>
 
         <hr>
+
         """
 
     # =================================================
@@ -501,26 +731,17 @@ def callback():
 
     return f"""
 
-    <h1>✅ Xero Connected Successfully</h1>
+    <h1>
+    ✅ Xero Connected Successfully
+    </h1>
 
     <h2>Tenant Name</h2>
-    <pre>{tenant_name}</pre>
 
-    <h2>Tenant ID</h2>
-    <pre>{tenant_id}</pre>
+    <pre>{tenant_name}</pre>
 
     <h2>Upload Results</h2>
 
     {results_html}
-
-    <h2>Employees</h2>
-    <pre>{employees_json}</pre>
-
-    <h2>Timesheets</h2>
-    <pre>{timesheets_json}</pre>
-
-    <h2>Pay Runs</h2>
-    <pre>{payruns_json}</pre>
 
     """
 
@@ -532,9 +753,12 @@ def callback():
 def handle_exception(e):
 
     return f"""
+
     <h1>Application Error</h1>
+
     <pre>{str(e)}</pre>
-    """, 500
+
+    """
 
 # =====================================================
 # START SERVER
@@ -542,12 +766,13 @@ def handle_exception(e):
 
 if __name__ == "__main__":
 
-    port = int(os.environ.get("PORT", 5000))
+    port = int(
+        os.environ.get("PORT", 5000)
+    )
 
     app.run(
         host="0.0.0.0",
         port=port,
         debug=True,
     )
-
 
