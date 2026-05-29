@@ -55,7 +55,7 @@ FORTNIGHTLY_CALENDAR_ID = "590c0331-8b61-40ac-bbfa-33d7ed78e5d6"
 # EARNINGS RATE ID
 # =========================================
 
-earnings_rate_id = "earningsRateID"
+
 
 # =========================================
 # HOME
@@ -232,6 +232,8 @@ def callback():
             date = work_date.strftime("%Y-%m-%d")
 
             number_of_units = float(row["numberOfUnits"])
+
+            earnings_rate_id = str(row["earningsRateID"]).strip()
 
             # =====================================
             # WEEKLY / FORTNIGHTLY
