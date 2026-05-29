@@ -104,6 +104,7 @@ def home():
             "payroll.employees "
             "payroll.timesheets "
             "payroll.payruns"
+            "payroll.settings"
         ),
         "state": state,
     }
