@@ -1,3 +1,4 @@
+import row
 from flask import Flask, request, redirect, session
 from urllib.parse import urlencode
 import os
@@ -53,7 +54,7 @@ FORTNIGHTLY_CALENDAR_ID = "590c0331-8b61-40ac-bbfa-33d7ed78e5d6"
 # EARNINGS RATE ID
 # =========================================
 
-EARNINGS_RATE_ID = row["earningsRateID"]
+earnings_rate_id = row["earningsRateID"]
 
 # =========================================
 # HOME
@@ -284,7 +285,7 @@ def callback():
                 "timesheetLines": [
                     {
                         "date": date,
-                        "earningsRateID": EARNINGS_RATE_ID,
+                        "earningsRateID": earnings_rate_id,
                         "numberOfUnits": number_of_units,
                     }
                 ]
