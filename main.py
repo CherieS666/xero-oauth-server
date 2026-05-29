@@ -344,8 +344,7 @@ def callback():
     <h2>Pay Runs</h2>
     <pre>{payruns_json}</pre>
 
-    <h2>Earnings Rates</h2>
-    <pre>{earnings_json}</pre>
+    
 
     """
 
