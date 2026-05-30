@@ -44,6 +44,8 @@ PAYRUNS_URL = "https://api.xero.com/payroll.xro/2.0/PayRuns"
 
 
 
+
+
 # =========================================
 # PAYROLL CALENDAR IDS
 # =========================================
@@ -345,6 +347,12 @@ def callback():
         )
     except Exception:
         timesheets_json = timesheets_response.text
+
+    print(json.dumps(timesheets_response.json(), indent=2))
+
+
+
+
 
     # =====================================
     # GET EMPLOYEES
