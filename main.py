@@ -350,6 +350,16 @@ def callback():
 
     print(json.dumps(timesheets_response.json(), indent=2))
 
+    timesheet_id = "b01fafc8-6867-4404-a1b7-2c1bbf4f42a1"
+
+    timesheet_response = requests.get(
+        f"{TIMESHEETS_URL}/{timesheet_id}",
+        headers=headers
+    )
+
+    print(timesheet_response.status_code)
+    print(json.dumps(timesheet_response.json(), indent=2))
+
 
 
 
