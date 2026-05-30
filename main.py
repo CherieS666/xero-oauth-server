@@ -292,6 +292,7 @@ def callback():
                 ]
             }
 
+            print("POSTING RATE:", earnings_rate_id)
             print("PAYLOAD:")
             print(json.dumps(payload, indent=2))
 
@@ -367,11 +368,25 @@ def callback():
         headers=headers
     )
 
+
     print("TIMESHEET DETAIL STATUS")
     print(timesheet_response.status_code)
 
     print("TIMESHEET DETAIL RAW")
     print(timesheet_response.text)
+
+    valid_rates = {
+        "e5d80793-5b30-401d-a278-6d782e086a00",
+        "11538a17-b33b-49f1-98f1-ff3989fd714a",
+        "3747f42a-4cda-40c6-8e8f-896cd931f557",
+        "15fc2656-d897-4028-99ad-6867bc5b8898",
+        "5ec4fd97-e8ae-4252-80a5-35d41943591c",
+        "9022e157-e36e-4603-bf04-f0cf3a3bea37",
+        "3d54dcc7-9457-4dce-9a2f-ee9be4cc87db"
+    }
+
+    print("Using:", earnings_rate_id)
+    print("Valid:", earnings_rate_id in valid_rates)
 
     try:
         print("TIMESHEET DETAIL JSON")
@@ -379,6 +394,8 @@ def callback():
     except Exception as e:
         print("JSON ERROR")
         print(str(e))
+
+
 
 
 
