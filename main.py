@@ -295,6 +295,16 @@ def callback():
             print("PAYLOAD:")
             print(json.dumps(payload, indent=2))
 
+
+            response = requests.post(
+                TIMESHEETS_URL,
+                headers=headers,
+                json=payload
+            )
+
+            print("RESPONSE:")
+            print(response.text)
+
             # =====================================
             # CREATE TIMESHEET
             # =====================================
