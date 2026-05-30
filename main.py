@@ -357,8 +357,18 @@ def callback():
         headers=headers
     )
 
+    print("TIMESHEET DETAIL STATUS")
     print(timesheet_response.status_code)
-    print(json.dumps(timesheet_response.json(), indent=2))
+
+    print("TIMESHEET DETAIL RAW")
+    print(timesheet_response.text)
+
+    try:
+        print("TIMESHEET DETAIL JSON")
+        print(json.dumps(timesheet_response.json(), indent=2))
+    except Exception as e:
+        print("JSON ERROR")
+        print(str(e))
 
 
 
@@ -423,6 +433,12 @@ def callback():
     # SUCCESS PAGE
     # =====================================
 
+    timesheet_detail = json.dumps(
+        timesheet_response.json(),
+        indent=2
+    )
+
+
     return f"""
 
     <h1>✅ Xero Connected Successfully</h1>
@@ -442,6 +458,9 @@ def callback():
 
     <h2>All Timesheets</h2>
     <pre>{timesheets_json}</pre>
+    
+    <h2>Timesheet Detail</h2>
+    <pre>{timesheet_detail}</pre>
 
     <h2>All Pay Runs</h2>
     <pre>{payruns_json}</pre>
